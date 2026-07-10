@@ -290,6 +290,12 @@
     color-scheme: dark;
   }
 
+  .fx-note{
+    margin-top: 6px;
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
   input.cell.error-field{ border-color: var(--loss); }
   .field-note{
     font-size: 0.68rem;
@@ -476,7 +482,7 @@
 
   let pendingDeleteIdx = null;
   let pressTimer = null;
-  const HOLD_MS = 3500;
+  const HOLD_MS = 5000;
 
   function nuevaFila(){
     filas.push({ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', fecha:'', fxCompra:null, fxCompraFecha:'', error:false});
@@ -559,6 +565,13 @@
           <div class="field">
             <label>Nº acciones</label>
             <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="acciones" value="${fila.acciones}" placeholder="0">
+            <div class="fx-note">${
+              fila.moneda === '€' ? '' :
+              (!fila.fecha ? '' :
+                (fila.fxCompra && fila.fxCompraFecha === fila.fecha
+                  ? `1 $ = ${fila.fxCompra.toLocaleString('es-ES',{maximumFractionDigits:4})} €`
+                  : 'Pulsa "Actualizar precios"'))
+            }</div>
           </div>
           <div class="field">
             <label>Precio compra</label>
