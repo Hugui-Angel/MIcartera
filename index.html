@@ -238,6 +238,35 @@
 
   .calc-box.error{ color: var(--loss); font-size: 0.78rem; }
   .calc-box.pending{ color: var(--muted); }
+
+  .currency-toggle{
+    display:flex;
+    gap: 4px;
+    margin-top: 5px;
+  }
+  .currency-toggle button{
+    flex:1;
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    color: var(--muted);
+    padding: 4px 0;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .currency-toggle button.active{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0b1a10;
+  }
+
+  input.cell.error-field{ border-color: var(--loss); }
+  .field-note{
+    font-size: 0.68rem;
+    color: var(--loss);
+    margin-top: 4px;
+  }
 </style>
 </head>
 <body>
@@ -249,11 +278,6 @@
     </div>
     <button class="add" id="addBtn">+ Añadir ticker</button>
   </header>
-
-  <div class="settings">
-    <input class="apikey" id="apiKeyInput" type="text" placeholder="Tu API key de Finnhub">
-    <a href="https://finnhub.io/register" target="_blank" rel="noopener">Consigue una clave gratis ↗</a>
-  </div>
 
   <div class="update-bar">
     <button class="refresh" id="refreshBtn"><span class="icon">⟳</span> Actualizar precios</button>
@@ -269,6 +293,11 @@
 
   <div id="list"></div>
   <div class="hint">Mantén pulsada una tarjeta para borrarla</div>
+
+  <div class="settings">
+    <input class="apikey" id="apiKeyInput" type="text" placeholder="Tu API key de Finnhub">
+    <a href="https://finnhub.io/register" target="_blank" rel="noopener">Consigue una clave gratis ↗</a>
+  </div>
 </div>
 
 <div class="modal-backdrop hidden" id="modalBackdrop">
@@ -308,14 +337,15 @@
 
   let filas = cargar();
   if (filas.length === 0){
-    filas = [{ticker:'', compra:'', actualUSD:null, acciones:'', error:false}];
+    filas = [{ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', error:false}];
   }
-  // Migración: filas antiguas con "actual" manual pasan a actualUSD
+  // Migración: filas antiguas sin actualUSD o sin moneda
   filas = filas.map(f => ({
     ticker: f.ticker || '',
     compra: f.compra || '',
     acciones: f.acciones || '',
     actualUSD: (f.actualUSD !== undefined) ? f.actualUSD : (f.actual || null),
+    moneda: f.moneda || '$',
     error: false
   }));
 
@@ -333,7 +363,7 @@
   const HOLD_MS = 600;
 
   function nuevaFila(){
-    filas.push({ticker:'', compra:'', actualUSD:null, acciones:'', error:false});
+    filas.push({ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', error:false});
     guardar();
     render();
   }
@@ -367,7 +397,7 @@
 
   function attachHold(card, idx){
     const start = (e) => {
-      if (e.target.closest('input')) return;
+      if (e.target.closest('input') || e.target.closest('.currency-toggle')) return;
       card.classList.add('pressing');
       pressTimer = setTimeout(() => {
         card.classList.remove('pressing');
@@ -394,21 +424,26 @@
     filas.forEach((fila, idx) => {
       const card = document.createElement('div');
       card.className = 'card';
-      const precioActualTxt = fila.error ? 'Error' : (fila.actualUSD ? fmtUSD(parseFloat(fila.actualUSD)) : 'Pendiente');
-      const precioActualClass = fila.error ? 'calc-box error' : (fila.actualUSD ? 'calc-box' : 'calc-box pending');
+      const simbolo = fila.moneda === '€' ? '€' : '$';
+      const errorNote = fila.error ? `<div class="field-note">No se pudo obtener, edítalo a mano</div>` : '';
       card.innerHTML = `
         <div class="row">
           <div class="field">
             <label>Ticker</label>
             <input class="cell ticker" data-idx="${idx}" data-campo="ticker" value="${fila.ticker || ''}" placeholder="AAPL">
+            <div class="currency-toggle" data-idx="${idx}">
+              <button type="button" data-moneda="$" class="${fila.moneda !== '€' ? 'active' : ''}">$</button>
+              <button type="button" data-moneda="€" class="${fila.moneda === '€' ? 'active' : ''}">€</button>
+            </div>
           </div>
           <div class="field">
-            <label>Precio compra ($)</label>
+            <label>Precio compra (${simbolo})</label>
             <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="compra" value="${fila.compra}" placeholder="0.00">
           </div>
           <div class="field">
-            <label>Precio actual ($)</label>
-            <div class="${precioActualClass}" data-out="actualUSD">${precioActualTxt}</div>
+            <label>Precio actual (${simbolo})</label>
+            <input class="cell ${fila.error ? 'error-field' : ''}" type="number" step="any" data-idx="${idx}" data-campo="actualUSD" value="${fila.actualUSD !== null && fila.actualUSD !== undefined ? fila.actualUSD : ''}" placeholder="Pendiente">
+            ${errorNote}
           </div>
           <div class="field">
             <label>Nº acciones</label>
@@ -442,7 +477,17 @@
       inp.addEventListener('input', e => {
         const idx = parseInt(e.target.dataset.idx);
         const campo = e.target.dataset.campo;
+        if (campo === 'actualUSD'){ filas[idx].error = false; }
         actualizarCampo(idx, campo, e.target.value);
+      });
+    });
+
+    list.querySelectorAll('.currency-toggle button').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const idx = parseInt(e.target.closest('.currency-toggle').dataset.idx);
+        filas[idx].moneda = e.target.dataset.moneda;
+        guardar();
+        render();
       });
     });
 
@@ -466,12 +511,15 @@
       const outGP = card.querySelector('[data-out="ganPct"]');
 
       const datosCompletos = isFinite(compraUSD) && isFinite(actualUSD) && isFinite(acciones) && compraUSD > 0 && acciones > 0;
+      const esEuro = f.moneda === '€';
+      const rateFila = esEuro ? 1 : rate;
+      const rateDisponible = esEuro ? true : !!rate;
 
-      if (datosCompletos && rate){
-        const invertidoUSD = compraUSD * acciones;
-        const valorUSD = actualUSD * acciones;
-        const invertidoEUR = invertidoUSD * rate;
-        const valorEUR = valorUSD * rate;
+      if (datosCompletos && rateDisponible){
+        const invertidoOrig = compraUSD * acciones;
+        const valorOrig = actualUSD * acciones;
+        const invertidoEUR = invertidoOrig * rateFila;
+        const valorEUR = valorOrig * rateFila;
         const ganEUR = valorEUR - invertidoEUR;
         const ganPct = (ganEUR / invertidoEUR) * 100;
 
@@ -490,7 +538,7 @@
         hayDatos = true;
       } else {
         [outInv, outVal, outGE, outGP].forEach(el => {
-          el.textContent = datosCompletos && !rate ? 'Sin tipo €' : '—';
+          el.textContent = datosCompletos && !rateDisponible ? 'Sin tipo €' : '—';
           el.classList.remove('pos','neg');
         });
       }
