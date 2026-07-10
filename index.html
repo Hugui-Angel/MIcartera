@@ -100,6 +100,24 @@
     letter-spacing: .03em;
     color: var(--muted);
     margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .input-unit{
+    position: relative;
+  }
+  .input-unit input.cell{
+    padding-right: 26px;
+  }
+  .input-unit .unit{
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 0.78rem;
+    pointer-events: none;
   }
   input.cell{
     width: 100%;
@@ -305,6 +323,7 @@
     margin-top: 10px;
     flex-wrap: wrap;
     flex-basis: 100%;
+    justify-content: center;
   }
   .backup-row button{
     background: var(--input-bg);
@@ -367,8 +386,8 @@
   <div class="modal">
     <p>¿Borrar <span class="ticker-name" id="modalTicker">este ticker</span> de la cartera?</p>
     <div class="modal-btns">
-      <button id="modalCancel">Cancelar</button>
       <button class="confirm" id="modalConfirm">Aceptar</button>
+      <button id="modalCancel">Cancelar</button>
     </div>
   </div>
 </div>
@@ -443,7 +462,7 @@
 
   let pendingDeleteIdx = null;
   let pressTimer = null;
-  const HOLD_MS = 2000;
+  const HOLD_MS = 3500;
 
   function nuevaFila(){
     filas.push({ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', error:false});
@@ -520,17 +539,23 @@
             </div>
           </div>
           <div class="field">
-            <label>Precio compra (${simbolo})</label>
-            <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="compra" value="${fila.compra}" placeholder="0.00">
-          </div>
-          <div class="field">
-            <label>Precio actual (${simbolo})</label>
-            <input class="cell ${fila.error ? 'error-field' : ''}" type="number" step="any" data-idx="${idx}" data-campo="actualUSD" value="${fila.actualUSD !== null && fila.actualUSD !== undefined ? fila.actualUSD : ''}" placeholder="Pendiente">
-            ${errorNote}
-          </div>
-          <div class="field">
             <label>Nº acciones</label>
             <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="acciones" value="${fila.acciones}" placeholder="0">
+          </div>
+          <div class="field">
+            <label>Precio compra</label>
+            <div class="input-unit">
+              <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="compra" value="${fila.compra}" placeholder="0.00">
+              <span class="unit">${simbolo}</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Precio actual</label>
+            <div class="input-unit">
+              <input class="cell ${fila.error ? 'error-field' : ''}" type="number" step="any" data-idx="${idx}" data-campo="actualUSD" value="${fila.actualUSD !== null && fila.actualUSD !== undefined ? fila.actualUSD : ''}" placeholder="Pendiente">
+              <span class="unit">${simbolo}</span>
+            </div>
+            ${errorNote}
           </div>
         </div>
         <div class="row row-calc">
