@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartera — AliTrack</title>
+<style>
+  :root{
+    --bg: #2c4a6e;
+    --panel: #23405f;
+    --panel-border: #3a5d84;
+    --text: #f2f6fa;
+    --muted: #b7cbe2;
+    --accent: #5fd68f;
+    --loss: #ef8484;
+    --input-bg: #1a3350;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background: radial-gradient(circle at 20% -10%, #325577 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    padding: 28px 16px 60px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap{ max-width: 640px; margin: 0 auto; }
+
+  header{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  h1{ font-size: 1.4rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .sub{ color: var(--muted); font-size: 0.82rem; }
+
+  button.add{
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: transform .1s ease, opacity .15s ease, background .15s ease;
+  }
+  button.add:hover{ background: var(--input-bg); }
+  button.add:active{ transform: scale(0.97); }
+
+  /* Resumen total */
+  .summary{
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 16px 16px;
+    margin-bottom: 18px;
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .summary .item{ text-align:center; }
+  .summary .k{ font-size: 0.68rem; text-transform:uppercase; letter-spacing:.04em; color: var(--muted); display:block; margin-bottom:4px; }
+  .summary .v{ font-size: 0.98rem; font-weight: 700; color: var(--text); }
+
+  /* Tarjetas */
+  #list{ display:flex; flex-direction:column; gap: 16px; }
+
+  .card{
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 12px;
+    position: relative;
+    user-select: none;
+    transition: background .2s ease, transform .1s ease;
+  }
+  .card.pressing{ background: rgba(239,132,132,0.18); transform: scale(0.99); }
+
+  .row{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .row + .row{
+    margin-top: 8px;
+  }
+
+  .field label{
+    display:block;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  input.cell{
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 8px 8px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    outline: none;
+  }
+  input.cell:focus{ border-color: var(--accent); }
+  input.ticker{ text-transform: uppercase; font-weight: 700; }
+
+  .calc-box{
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 8px 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    min-height: 34px;
+    display:flex;
+    align-items:center;
+  }
+  .calc-box.pos{ color: var(--accent); }
+  .calc-box.neg{ color: var(--loss); }
+
+  .hint{
+    text-align:center;
+    color: var(--muted);
+    font-size: 0.68rem;
+    margin-top: 8px;
+  }
+
+  .empty-state{ text-align:center; color: var(--muted); padding: 30px 10px; font-size: 0.85rem; }
+
+  /* Modal confirmacion */
+  .modal-backdrop{
+    position: fixed; inset:0;
+    background: rgba(0,0,0,0.55);
+    display:flex; align-items:center; justify-content:center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .modal{
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 20px;
+    max-width: 300px;
+    width: 100%;
+    text-align:center;
+  }
+  .modal p{ font-size: 0.92rem; margin: 0 0 18px; }
+  .modal .ticker-name{ font-weight:700; color: var(--accent); }
+  .modal-btns{ display:flex; gap: 10px; }
+  .modal-btns button{
+    flex:1;
+    padding: 10px;
+    border-radius: 9px;
+    border: 1px solid var(--panel-border);
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 0.88rem;
+    cursor: pointer;
+  }
+  .modal-btns button.confirm{
+    background: var(--loss);
+    border-color: var(--loss);
+    color: #2a0d0d;
+    font-weight: 700;
+  }
+  .hidden{ display:none; }
+  .settings{
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    display:flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items:center;
+  }
+  .settings input.apikey{
+    flex: 1;
+    min-width: 180px;
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 9px 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    outline: none;
+  }
+  .settings input.apikey:focus{ border-color: var(--accent); }
+  .settings a{
+    color: var(--accent);
+    font-size: 0.78rem;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .settings a:hover{ text-decoration: underline; }
+
+  .update-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  button.refresh{
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background .15s ease, transform .1s ease;
+    display:flex;
+    align-items:center;
+    gap: 6px;
+  }
+  button.refresh:hover{ background: var(--input-bg); }
+  button.refresh:active{ transform: scale(0.97); }
+  button.refresh:disabled{ opacity: 0.6; cursor: default; }
+  button.refresh.spinning .icon{ animation: spin 0.8s linear infinite; display:inline-block; }
+  @keyframes spin{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+
+  .update-info{
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .fx-error{ color: var(--loss); }
+
+  .calc-box.error{ color: var(--loss); font-size: 0.78rem; }
+  .calc-box.pending{ color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Mi Cartera</h1>
+      <div class="sub">Ganancias y pérdidas por ticker · en €</div>
+    </div>
+    <button class="add" id="addBtn">+ Añadir ticker</button>
+  </header>
+
+  <div class="settings">
+    <input class="apikey" id="apiKeyInput" type="text" placeholder="Tu API key de Finnhub">
+    <a href="https://finnhub.io/register" target="_blank" rel="noopener">Consigue una clave gratis ↗</a>
+  </div>
+
+  <div class="update-bar">
+    <button class="refresh" id="refreshBtn"><span class="icon">⟳</span> Actualizar precios</button>
+    <div class="update-info" id="updateInfo">Sin actualizar todavía</div>
+  </div>
+
+  <div class="summary">
+    <div class="item"><span class="k">Invertido €</span><span class="v" id="totInvertido">—</span></div>
+    <div class="item"><span class="k">Valor actual €</span><span class="v" id="totValor">—</span></div>
+    <div class="item"><span class="k">Ganancia €</span><span class="v" id="totGanEUR">—</span></div>
+    <div class="item"><span class="k">Ganancia %</span><span class="v" id="totGanPct">—</span></div>
+  </div>
+
+  <div id="list"></div>
+  <div class="hint">Mantén pulsada una tarjeta para borrarla</div>
+</div>
+
+<div class="modal-backdrop hidden" id="modalBackdrop">
+  <div class="modal">
+    <p>¿Borrar <span class="ticker-name" id="modalTicker">este ticker</span> de la cartera?</p>
+    <div class="modal-btns">
+      <button id="modalCancel">Cancelar</button>
+      <button class="confirm" id="modalConfirm">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'alitrack_cartera';
+  const APIKEY_KEY = 'alitrack_finnhub_key';
+  const list = document.getElementById('list');
+  const addBtn = document.getElementById('addBtn');
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  const modalTicker = document.getElementById('modalTicker');
+  const modalCancel = document.getElementById('modalCancel');
+  const modalConfirm = document.getElementById('modalConfirm');
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const updateInfo = document.getElementById('updateInfo');
+
+  const fmtEUR = n => n.toLocaleString('es-ES', {style:'currency', currency:'EUR', maximumFractionDigits:2});
+  const fmtUSD = n => n.toLocaleString('es-ES', {style:'currency', currency:'USD', maximumFractionDigits:2});
+  const fmtPct = n => (isFinite(n) ? ((n>=0?'+':'') + n.toLocaleString('es-ES', {maximumFractionDigits:2}) + ' %') : '—');
+
+  function cargar(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function guardar(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(filas)); }
+
+  let filas = cargar();
+  if (filas.length === 0){
+    filas = [{ticker:'', compra:'', actualUSD:null, acciones:'', error:false}];
+  }
+  // Migración: filas antiguas con "actual" manual pasan a actualUSD
+  filas = filas.map(f => ({
+    ticker: f.ticker || '',
+    compra: f.compra || '',
+    acciones: f.acciones || '',
+    actualUSD: (f.actualUSD !== undefined) ? f.actualUSD : (f.actual || null),
+    error: false
+  }));
+
+  let fxRate = null; // 1 USD = fxRate EUR
+  let ultimaActualizacion = null;
+
+  // API key
+  apiKeyInput.value = localStorage.getItem(APIKEY_KEY) || '';
+  apiKeyInput.addEventListener('input', () => {
+    localStorage.setItem(APIKEY_KEY, apiKeyInput.value.trim());
+  });
+
+  let pendingDeleteIdx = null;
+  let pressTimer = null;
+  const HOLD_MS = 600;
+
+  function nuevaFila(){
+    filas.push({ticker:'', compra:'', actualUSD:null, acciones:'', error:false});
+    guardar();
+    render();
+  }
+
+  function pedirBorrado(idx){
+    pendingDeleteIdx = idx;
+    const nombre = (filas[idx].ticker || '').trim();
+    modalTicker.textContent = nombre ? nombre.toUpperCase() : 'este ticker';
+    modalBackdrop.classList.remove('hidden');
+  }
+  function cerrarModal(){
+    modalBackdrop.classList.add('hidden');
+    pendingDeleteIdx = null;
+  }
+  modalCancel.addEventListener('click', cerrarModal);
+  modalBackdrop.addEventListener('click', e => { if (e.target === modalBackdrop) cerrarModal(); });
+  modalConfirm.addEventListener('click', () => {
+    if (pendingDeleteIdx !== null){
+      filas.splice(pendingDeleteIdx, 1);
+      guardar();
+      render();
+    }
+    cerrarModal();
+  });
+
+  function actualizarCampo(idx, campo, valor){
+    filas[idx][campo] = valor;
+    guardar();
+    renderCalculos();
+  }
+
+  function attachHold(card, idx){
+    const start = (e) => {
+      if (e.target.closest('input')) return;
+      card.classList.add('pressing');
+      pressTimer = setTimeout(() => {
+        card.classList.remove('pressing');
+        pedirBorrado(idx);
+      }, HOLD_MS);
+    };
+    const cancel = () => {
+      clearTimeout(pressTimer);
+      card.classList.remove('pressing');
+    };
+    card.addEventListener('mousedown', start);
+    card.addEventListener('touchstart', start, {passive:true});
+    ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev => card.addEventListener(ev, cancel));
+  }
+
+  function render(){
+    list.innerHTML = '';
+    if (filas.length === 0){
+      list.innerHTML = '<div class="empty-state">No hay tickers. Pulsa "+ Añadir ticker" para empezar.</div>';
+      renderCalculos();
+      return;
+    }
+
+    filas.forEach((fila, idx) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const precioActualTxt = fila.error ? 'Error' : (fila.actualUSD ? fmtUSD(parseFloat(fila.actualUSD)) : 'Pendiente');
+      const precioActualClass = fila.error ? 'calc-box error' : (fila.actualUSD ? 'calc-box' : 'calc-box pending');
+      card.innerHTML = `
+        <div class="row">
+          <div class="field">
+            <label>Ticker</label>
+            <input class="cell ticker" data-idx="${idx}" data-campo="ticker" value="${fila.ticker || ''}" placeholder="AAPL">
+          </div>
+          <div class="field">
+            <label>Precio compra ($)</label>
+            <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="compra" value="${fila.compra}" placeholder="0.00">
+          </div>
+          <div class="field">
+            <label>Precio actual ($)</label>
+            <div class="${precioActualClass}" data-out="actualUSD">${precioActualTxt}</div>
+          </div>
+          <div class="field">
+            <label>Nº acciones</label>
+            <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="acciones" value="${fila.acciones}" placeholder="0">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Invertido €</label>
+            <div class="calc-box" data-out="invertido">—</div>
+          </div>
+          <div class="field">
+            <label>Valor actual €</label>
+            <div class="calc-box" data-out="valor">—</div>
+          </div>
+          <div class="field">
+            <label>Ganancia €</label>
+            <div class="calc-box" data-out="ganEUR">—</div>
+          </div>
+          <div class="field">
+            <label>Ganancia %</label>
+            <div class="calc-box" data-out="ganPct">—</div>
+          </div>
+        </div>
+      `;
+      list.appendChild(card);
+      attachHold(card, idx);
+    });
+
+    list.querySelectorAll('input.cell').forEach(inp => {
+      inp.addEventListener('input', e => {
+        const idx = parseInt(e.target.dataset.idx);
+        const campo = e.target.dataset.campo;
+        actualizarCampo(idx, campo, e.target.value);
+      });
+    });
+
+    renderCalculos();
+  }
+
+  function renderCalculos(){
+    const cards = list.querySelectorAll('.card');
+    let totInvertido = 0, totValor = 0, hayDatos = false;
+    const rate = fxRate; // 1 USD -> rate EUR
+
+    cards.forEach((card, idx) => {
+      const f = filas[idx];
+      const compraUSD = parseFloat(f.compra);
+      const actualUSD = parseFloat(f.actualUSD);
+      const acciones = parseFloat(f.acciones);
+
+      const outInv = card.querySelector('[data-out="invertido"]');
+      const outVal = card.querySelector('[data-out="valor"]');
+      const outGE = card.querySelector('[data-out="ganEUR"]');
+      const outGP = card.querySelector('[data-out="ganPct"]');
+
+      const datosCompletos = isFinite(compraUSD) && isFinite(actualUSD) && isFinite(acciones) && compraUSD > 0 && acciones > 0;
+
+      if (datosCompletos && rate){
+        const invertidoUSD = compraUSD * acciones;
+        const valorUSD = actualUSD * acciones;
+        const invertidoEUR = invertidoUSD * rate;
+        const valorEUR = valorUSD * rate;
+        const ganEUR = valorEUR - invertidoEUR;
+        const ganPct = (ganEUR / invertidoEUR) * 100;
+
+        outInv.textContent = fmtEUR(invertidoEUR);
+        outVal.textContent = fmtEUR(valorEUR);
+        outGE.textContent = fmtEUR(ganEUR);
+        outGP.textContent = fmtPct(ganPct);
+
+        [outGE, outGP].forEach(el => {
+          el.classList.remove('pos','neg');
+          el.classList.add(ganEUR >= 0 ? 'pos' : 'neg');
+        });
+
+        totInvertido += invertidoEUR;
+        totValor += valorEUR;
+        hayDatos = true;
+      } else {
+        [outInv, outVal, outGE, outGP].forEach(el => {
+          el.textContent = datosCompletos && !rate ? 'Sin tipo €' : '—';
+          el.classList.remove('pos','neg');
+        });
+      }
+    });
+
+    const totGanEUR = totValor - totInvertido;
+    const totGanPct = totInvertido > 0 ? (totGanEUR / totInvertido) * 100 : NaN;
+
+    document.getElementById('totInvertido').textContent = hayDatos ? fmtEUR(totInvertido) : '—';
+    document.getElementById('totValor').textContent = hayDatos ? fmtEUR(totValor) : '—';
+
+    const totGEEl = document.getElementById('totGanEUR');
+    const totGPEl = document.getElementById('totGanPct');
+    totGEEl.textContent = hayDatos ? fmtEUR(totGanEUR) : '—';
+    totGPEl.textContent = hayDatos ? fmtPct(totGanPct) : '—';
+    totGEEl.style.color = hayDatos ? (totGanEUR >= 0 ? 'var(--accent)' : 'var(--loss)') : 'var(--text)';
+    totGPEl.style.color = totGEEl.style.color;
+  }
+
+  async function obtenerTipoCambio(){
+    const resp = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR');
+    if (!resp.ok) throw new Error('fx');
+    const data = await resp.json();
+    return data.rates.EUR;
+  }
+
+  async function obtenerPrecio(ticker, apiKey){
+    const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${encodeURIComponent(apiKey)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('http');
+    const data = await resp.json();
+    if (!data || typeof data.c !== 'number' || data.c === 0) throw new Error('sin datos');
+    return data.c;
+  }
+
+  function esperar(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  async function actualizarPrecios(){
+    const apiKey = (localStorage.getItem(APIKEY_KEY) || '').trim();
+    if (!apiKey){
+      updateInfo.innerHTML = '<span class="fx-error">Falta la API key de Finnhub (arriba)</span>';
+      apiKeyInput.focus();
+      return;
+    }
+
+    refreshBtn.disabled = true;
+    refreshBtn.classList.add('spinning');
+    updateInfo.textContent = 'Actualizando…';
+
+    try{
+      fxRate = await obtenerTipoCambio();
+    }catch(e){
+      fxRate = null;
+    }
+
+    for (let i = 0; i < filas.length; i++){
+      const ticker = (filas[i].ticker || '').trim().toUpperCase();
+      if (!ticker){ filas[i].error = false; continue; }
+      try{
+        const precio = await obtenerPrecio(ticker, apiKey);
+        filas[i].actualUSD = precio;
+        filas[i].error = false;
+      }catch(e){
+        filas[i].error = true;
+      }
+      await esperar(120);
+    }
+
+    guardar();
+    ultimaActualizacion = new Date();
+    const horaTxt = ultimaActualizacion.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+    updateInfo.textContent = fxRate
+      ? `Actualizado a las ${horaTxt} · 1 $ = ${fxRate.toLocaleString('es-ES',{maximumFractionDigits:4})} €`
+      : `Actualizado a las ${horaTxt} · no se pudo obtener el tipo de cambio`;
+
+    refreshBtn.disabled = false;
+    refreshBtn.classList.remove('spinning');
+    render();
+  }
+
+  refreshBtn.addEventListener('click', actualizarPrecios);
+  addBtn.addEventListener('click', nuevaFila);
+  render();
+</script>
+</body>
+</html>
