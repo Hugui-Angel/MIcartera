@@ -89,6 +89,9 @@
   .row + .row{
     margin-top: 8px;
   }
+  .row.row-3{
+    grid-template-columns: repeat(3, 1fr);
+  }
   .row.row-calc{
     grid-template-columns: repeat(2, 1fr);
   }
@@ -456,11 +459,12 @@
 
   let filas = cargar();
   if (filas.length === 0){
-    filas = [{ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', fecha:'', fxCompra:null, fxCompraFecha:'', error:false}];
+    filas = [{ticker:'', nombre:'', compra:'', actualUSD:null, acciones:'', moneda:'$', fecha:'', fxCompra:null, fxCompraFecha:'', error:false}];
   }
-  // Migración: filas antiguas sin actualUSD, moneda o fecha
+  // Migración: filas antiguas sin actualUSD, moneda, fecha o nombre
   filas = filas.map(f => ({
     ticker: f.ticker || '',
+    nombre: f.nombre || '',
     compra: f.compra || '',
     acciones: f.acciones || '',
     actualUSD: (f.actualUSD !== undefined) ? f.actualUSD : (f.actual || null),
@@ -485,7 +489,7 @@
   const HOLD_MS = 5000;
 
   function nuevaFila(){
-    filas.push({ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', fecha:'', fxCompra:null, fxCompraFecha:'', error:false});
+    filas.push({ticker:'', nombre:'', compra:'', actualUSD:null, acciones:'', moneda:'$', fecha:'', fxCompra:null, fxCompraFecha:'', error:false});
     guardar();
     render();
   }
@@ -553,15 +557,24 @@
       const simbolo = fila.moneda === '€' ? '€' : '$';
       const errorNote = fila.error ? `<div class="field-note">No se pudo obtener, edítalo a mano</div>` : '';
       card.innerHTML = `
-        <div class="row">
+        <div class="row row-3">
           <div class="field">
             <label>Ticker</label>
             <input class="cell ticker" data-idx="${idx}" data-campo="ticker" value="${fila.ticker || ''}" placeholder="AAPL">
+          </div>
+          <div class="field">
+            <label>Nombre</label>
+            <input class="cell" data-idx="${idx}" data-campo="nombre" value="${fila.nombre || ''}" placeholder="Apple Inc.">
+          </div>
+          <div class="field">
+            <label>Moneda</label>
             <div class="currency-toggle" data-idx="${idx}">
               <button type="button" data-moneda="$" class="${fila.moneda !== '€' ? 'active' : ''}">$</button>
               <button type="button" data-moneda="€" class="${fila.moneda === '€' ? 'active' : ''}">€</button>
             </div>
           </div>
+        </div>
+        <div class="row row-3">
           <div class="field">
             <label>Nº acciones</label>
             <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="acciones" value="${fila.acciones}" placeholder="0">
@@ -715,6 +728,15 @@
     return data.c;
   }
 
+  async function obtenerNombreEmpresa(ticker, apiKey){
+    const url = `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(ticker)}&token=${encodeURIComponent(apiKey)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('http');
+    const data = await resp.json();
+    if (!data || !data.name) throw new Error('sin nombre');
+    return data.name;
+  }
+
   function esperar(ms){ return new Promise(r => setTimeout(r, ms)); }
 
   async function actualizarPrecios(){
@@ -746,6 +768,16 @@
         filas[i].error = true;
       }
       await esperar(120);
+
+      // Nombre de la empresa, solo si el campo está vacío (no pisa lo que hayas escrito tú)
+      if (!filas[i].nombre || !filas[i].nombre.trim()){
+        try{
+          filas[i].nombre = await obtenerNombreEmpresa(ticker, apiKey);
+        }catch(e){
+          // si falla, se deja vacío y se puede escribir a mano
+        }
+        await esperar(120);
+      }
 
       // Tipo de cambio histórico, solo si hay fecha y no está ya en caché para esa fecha
       const fecha = filas[i].fecha;
@@ -838,6 +870,7 @@
         if (!Array.isArray(nuevasFilas)) throw new Error('formato');
         filas = nuevasFilas.map(f => ({
           ticker: f.ticker || '',
+          nombre: f.nombre || '',
           compra: f.compra || '',
           acciones: f.acciones || '',
           actualUSD: (f.actualUSD !== undefined) ? f.actualUSD : null,
