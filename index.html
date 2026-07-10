@@ -283,6 +283,13 @@
     color: #0b1a10;
   }
 
+  input.fecha-compra{
+    margin-top: 5px;
+    font-size: 0.72rem;
+    padding: 5px 7px;
+    color-scheme: dark;
+  }
+
   input.cell.error-field{ border-color: var(--loss); }
   .field-note{
     font-size: 0.68rem;
@@ -416,17 +423,18 @@
   const fmtUSD = n => n.toLocaleString('es-ES', {style:'currency', currency:'USD', maximumFractionDigits:2});
   const fmtPct = n => (isFinite(n) ? ((n>=0?'+':'') + n.toLocaleString('es-ES', {maximumFractionDigits:2}) + ' %') : '—');
 
-  function calcularFila(f, rate){
+  function calcularFila(f, rateHoy){
     const compraUSD = parseFloat(f.compra);
     const actualUSD = parseFloat(f.actualUSD);
     const acciones = parseFloat(f.acciones);
     const datosCompletos = isFinite(compraUSD) && isFinite(actualUSD) && isFinite(acciones) && compraUSD > 0 && acciones > 0;
     const esEuro = f.moneda === '€';
-    const rateFila = esEuro ? 1 : rate;
-    const rateDisponible = esEuro ? true : !!rate;
+    const rateInvertido = esEuro ? 1 : (f.fxCompra || rateHoy);
+    const rateActual = esEuro ? 1 : rateHoy;
+    const rateDisponible = esEuro ? true : (!!rateInvertido && !!rateActual);
     if (!datosCompletos || !rateDisponible) return null;
-    const invertidoEUR = compraUSD * acciones * rateFila;
-    const valorEUR = actualUSD * acciones * rateFila;
+    const invertidoEUR = compraUSD * acciones * rateInvertido;
+    const valorEUR = actualUSD * acciones * rateActual;
     const ganEUR = valorEUR - invertidoEUR;
     const ganPct = (ganEUR / invertidoEUR) * 100;
     return { invertidoEUR, valorEUR, ganEUR, ganPct };
@@ -442,15 +450,18 @@
 
   let filas = cargar();
   if (filas.length === 0){
-    filas = [{ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', error:false}];
+    filas = [{ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', fecha:'', fxCompra:null, fxCompraFecha:'', error:false}];
   }
-  // Migración: filas antiguas sin actualUSD o sin moneda
+  // Migración: filas antiguas sin actualUSD, moneda o fecha
   filas = filas.map(f => ({
     ticker: f.ticker || '',
     compra: f.compra || '',
     acciones: f.acciones || '',
     actualUSD: (f.actualUSD !== undefined) ? f.actualUSD : (f.actual || null),
     moneda: f.moneda || '$',
+    fecha: f.fecha || '',
+    fxCompra: f.fxCompra || null,
+    fxCompraFecha: f.fxCompraFecha || '',
     error: false
   }));
 
@@ -468,7 +479,7 @@
   const HOLD_MS = 3500;
 
   function nuevaFila(){
-    filas.push({ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', error:false});
+    filas.push({ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', fecha:'', fxCompra:null, fxCompraFecha:'', error:false});
     guardar();
     render();
   }
@@ -496,6 +507,10 @@
 
   function actualizarCampo(idx, campo, valor){
     filas[idx][campo] = valor;
+    if (campo === 'fecha'){
+      filas[idx].fxCompra = null;
+      filas[idx].fxCompraFecha = '';
+    }
     guardar();
     renderCalculos();
   }
@@ -551,6 +566,7 @@
               <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="compra" value="${fila.compra}" placeholder="0.00">
               <span class="unit">${simbolo}</span>
             </div>
+            <input class="cell fecha-compra" type="date" data-idx="${idx}" data-campo="fecha" value="${fila.fecha || ''}" title="Fecha de compra (opcional): usa el tipo de cambio de ese día">
           </div>
           <div class="field">
             <label>Precio actual</label>
@@ -669,6 +685,14 @@
     return data.rates.EUR;
   }
 
+  async function obtenerTipoCambioHistorico(fecha){
+    const resp = await fetch(`https://api.frankfurter.dev/v1/${fecha}?from=USD&to=EUR`);
+    if (!resp.ok) throw new Error('fx-hist');
+    const data = await resp.json();
+    if (!data || !data.rates || typeof data.rates.EUR !== 'number') throw new Error('fx-hist-format');
+    return data.rates.EUR;
+  }
+
   async function obtenerPrecio(ticker, apiKey){
     const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${encodeURIComponent(apiKey)}`;
     const resp = await fetch(url);
@@ -709,6 +733,19 @@
         filas[i].error = true;
       }
       await esperar(120);
+
+      // Tipo de cambio histórico, solo si hay fecha y no está ya en caché para esa fecha
+      const fecha = filas[i].fecha;
+      if (fecha && filas[i].moneda !== '€' && fecha !== filas[i].fxCompraFecha){
+        try{
+          const rateHist = await obtenerTipoCambioHistorico(fecha);
+          filas[i].fxCompra = rateHist;
+          filas[i].fxCompraFecha = fecha;
+        }catch(e){
+          // si falla, se queda sin tipo histórico y cae al tipo de hoy
+        }
+        await esperar(120);
+      }
     }
 
     guardar();
@@ -792,6 +829,9 @@
           acciones: f.acciones || '',
           actualUSD: (f.actualUSD !== undefined) ? f.actualUSD : null,
           moneda: f.moneda || '$',
+          fecha: f.fecha || '',
+          fxCompra: f.fxCompra || null,
+          fxCompraFecha: f.fxCompraFecha || '',
           error: false
         }));
         guardar();
