@@ -60,8 +60,8 @@
     padding: 16px 16px;
     margin-bottom: 18px;
     display:grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
   }
   .summary .item{ text-align:center; }
   .summary .k{ font-size: 0.68rem; text-transform:uppercase; letter-spacing:.04em; color: var(--muted); display:block; margin-bottom:4px; }
@@ -88,6 +88,9 @@
   }
   .row + .row{
     margin-top: 8px;
+  }
+  .row.row-calc{
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .field label{
@@ -267,6 +270,52 @@
     color: var(--loss);
     margin-top: 4px;
   }
+
+  .card.card-pos{
+    background: linear-gradient(0deg, rgba(95,214,143,0.10), rgba(95,214,143,0.10)), var(--panel);
+    border-color: rgba(95,214,143,0.35);
+  }
+  .card.card-neg{
+    background: linear-gradient(0deg, rgba(239,132,132,0.10), rgba(239,132,132,0.10)), var(--panel);
+    border-color: rgba(239,132,132,0.35);
+  }
+
+  .controls{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .controls select{
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    outline: none;
+  }
+
+  .backup-row{
+    display:flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    flex-basis: 100%;
+  }
+  .backup-row button{
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .backup-row button:hover{ border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -274,7 +323,6 @@
   <header>
     <div>
       <h1>Mi Cartera</h1>
-      <div class="sub">Ganancias y pérdidas por ticker · en €</div>
     </div>
     <button class="add" id="addBtn">+ Añadir ticker</button>
   </header>
@@ -285,10 +333,20 @@
   </div>
 
   <div class="summary">
-    <div class="item"><span class="k">Invertido €</span><span class="v" id="totInvertido">—</span></div>
-    <div class="item"><span class="k">Valor actual €</span><span class="v" id="totValor">—</span></div>
+    <div class="item"><span class="k">Capital invertido €</span><span class="v" id="totInvertido">—</span></div>
     <div class="item"><span class="k">Ganancia €</span><span class="v" id="totGanEUR">—</span></div>
+    <div class="item"><span class="k">Capital actual €</span><span class="v" id="totValor">—</span></div>
     <div class="item"><span class="k">Ganancia %</span><span class="v" id="totGanPct">—</span></div>
+  </div>
+
+  <div class="controls">
+    <label for="sortSelect">Ordenar por</label>
+    <select id="sortSelect">
+      <option value="ganPctDesc">Ganancia % (mayor a menor)</option>
+      <option value="ganPctAsc">Ganancia % (menor a mayor)</option>
+      <option value="invertidoDesc">Capital invertido (mayor a menor)</option>
+      <option value="alfabetico">Alfabético</option>
+    </select>
   </div>
 
   <div id="list"></div>
@@ -297,6 +355,11 @@
   <div class="settings">
     <input class="apikey" id="apiKeyInput" type="text" placeholder="Tu API key de Finnhub">
     <a href="https://finnhub.io/register" target="_blank" rel="noopener">Consigue una clave gratis ↗</a>
+    <div class="backup-row">
+      <button id="exportBtn">⬇ Exportar copia</button>
+      <button id="importBtn">⬆ Importar copia</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none">
+    </div>
   </div>
 </div>
 
@@ -322,10 +385,30 @@
   const apiKeyInput = document.getElementById('apiKeyInput');
   const refreshBtn = document.getElementById('refreshBtn');
   const updateInfo = document.getElementById('updateInfo');
+  const sortSelect = document.getElementById('sortSelect');
+  const exportBtn = document.getElementById('exportBtn');
+  const importBtn = document.getElementById('importBtn');
+  const importFile = document.getElementById('importFile');
 
   const fmtEUR = n => n.toLocaleString('es-ES', {style:'currency', currency:'EUR', maximumFractionDigits:2});
   const fmtUSD = n => n.toLocaleString('es-ES', {style:'currency', currency:'USD', maximumFractionDigits:2});
   const fmtPct = n => (isFinite(n) ? ((n>=0?'+':'') + n.toLocaleString('es-ES', {maximumFractionDigits:2}) + ' %') : '—');
+
+  function calcularFila(f, rate){
+    const compraUSD = parseFloat(f.compra);
+    const actualUSD = parseFloat(f.actualUSD);
+    const acciones = parseFloat(f.acciones);
+    const datosCompletos = isFinite(compraUSD) && isFinite(actualUSD) && isFinite(acciones) && compraUSD > 0 && acciones > 0;
+    const esEuro = f.moneda === '€';
+    const rateFila = esEuro ? 1 : rate;
+    const rateDisponible = esEuro ? true : !!rate;
+    if (!datosCompletos || !rateDisponible) return null;
+    const invertidoEUR = compraUSD * acciones * rateFila;
+    const valorEUR = actualUSD * acciones * rateFila;
+    const ganEUR = valorEUR - invertidoEUR;
+    const ganPct = (ganEUR / invertidoEUR) * 100;
+    return { invertidoEUR, valorEUR, ganEUR, ganPct };
+  }
 
   function cargar(){
     try{
@@ -360,7 +443,7 @@
 
   let pendingDeleteIdx = null;
   let pressTimer = null;
-  const HOLD_MS = 600;
+  const HOLD_MS = 2000;
 
   function nuevaFila(){
     filas.push({ticker:'', compra:'', actualUSD:null, acciones:'', moneda:'$', error:false});
@@ -450,18 +533,18 @@
             <input class="cell" type="number" step="any" data-idx="${idx}" data-campo="acciones" value="${fila.acciones}" placeholder="0">
           </div>
         </div>
-        <div class="row">
+        <div class="row row-calc">
           <div class="field">
-            <label>Invertido €</label>
+            <label>Capital invertido €</label>
             <div class="calc-box" data-out="invertido">—</div>
-          </div>
-          <div class="field">
-            <label>Valor actual €</label>
-            <div class="calc-box" data-out="valor">—</div>
           </div>
           <div class="field">
             <label>Ganancia €</label>
             <div class="calc-box" data-out="ganEUR">—</div>
+          </div>
+          <div class="field">
+            <label>Capital actual €</label>
+            <div class="calc-box" data-out="valor">—</div>
           </div>
           <div class="field">
             <label>Ganancia %</label>
@@ -501,44 +584,36 @@
 
     cards.forEach((card, idx) => {
       const f = filas[idx];
-      const compraUSD = parseFloat(f.compra);
-      const actualUSD = parseFloat(f.actualUSD);
-      const acciones = parseFloat(f.acciones);
-
       const outInv = card.querySelector('[data-out="invertido"]');
       const outVal = card.querySelector('[data-out="valor"]');
       const outGE = card.querySelector('[data-out="ganEUR"]');
       const outGP = card.querySelector('[data-out="ganPct"]');
 
-      const datosCompletos = isFinite(compraUSD) && isFinite(actualUSD) && isFinite(acciones) && compraUSD > 0 && acciones > 0;
-      const esEuro = f.moneda === '€';
-      const rateFila = esEuro ? 1 : rate;
-      const rateDisponible = esEuro ? true : !!rate;
+      const r = calcularFila(f, rate);
+      card.classList.remove('card-pos','card-neg');
 
-      if (datosCompletos && rateDisponible){
-        const invertidoOrig = compraUSD * acciones;
-        const valorOrig = actualUSD * acciones;
-        const invertidoEUR = invertidoOrig * rateFila;
-        const valorEUR = valorOrig * rateFila;
-        const ganEUR = valorEUR - invertidoEUR;
-        const ganPct = (ganEUR / invertidoEUR) * 100;
-
-        outInv.textContent = fmtEUR(invertidoEUR);
-        outVal.textContent = fmtEUR(valorEUR);
-        outGE.textContent = fmtEUR(ganEUR);
-        outGP.textContent = fmtPct(ganPct);
+      if (r){
+        outInv.textContent = fmtEUR(r.invertidoEUR);
+        outVal.textContent = fmtEUR(r.valorEUR);
+        outGE.textContent = fmtEUR(r.ganEUR);
+        outGP.textContent = fmtPct(r.ganPct);
 
         [outGE, outGP].forEach(el => {
           el.classList.remove('pos','neg');
-          el.classList.add(ganEUR >= 0 ? 'pos' : 'neg');
+          el.classList.add(r.ganEUR >= 0 ? 'pos' : 'neg');
         });
+        card.classList.add(r.ganEUR >= 0 ? 'card-pos' : 'card-neg');
 
-        totInvertido += invertidoEUR;
-        totValor += valorEUR;
+        totInvertido += r.invertidoEUR;
+        totValor += r.valorEUR;
         hayDatos = true;
       } else {
+        const compraUSD = parseFloat(f.compra);
+        const actualUSD = parseFloat(f.actualUSD);
+        const acciones = parseFloat(f.acciones);
+        const datosCompletos = isFinite(compraUSD) && isFinite(actualUSD) && isFinite(acciones) && compraUSD > 0 && acciones > 0;
         [outInv, outVal, outGE, outGP].forEach(el => {
-          el.textContent = datosCompletos && !rateDisponible ? 'Sin tipo €' : '—';
+          el.textContent = datosCompletos ? 'Sin tipo €' : '—';
           el.classList.remove('pos','neg');
         });
       }
@@ -620,9 +695,96 @@
     render();
   }
 
+  // ---- Orden ----
+  const ORDEN_KEY = 'alitrack_orden';
+  sortSelect.value = localStorage.getItem(ORDEN_KEY) || 'ganPctDesc';
+
+  function ordenarFilas(){
+    const criterio = sortSelect.value;
+    localStorage.setItem(ORDEN_KEY, criterio);
+
+    const conDatos = filas.map((f, i) => ({ f, i, r: calcularFila(f, fxRate) }));
+
+    conDatos.sort((a, b) => {
+      switch(criterio){
+        case 'ganPctDesc':
+          return (b.r ? b.r.ganPct : -Infinity) - (a.r ? a.r.ganPct : -Infinity);
+        case 'ganPctAsc':
+          return (a.r ? a.r.ganPct : Infinity) - (b.r ? b.r.ganPct : Infinity);
+        case 'invertidoDesc':
+          return (b.r ? b.r.invertidoEUR : -Infinity) - (a.r ? a.r.invertidoEUR : -Infinity);
+        case 'alfabetico':
+          return (a.f.ticker || '').localeCompare(b.f.ticker || '');
+        default:
+          return 0;
+      }
+    });
+
+    filas = conDatos.map(o => o.f);
+  }
+
+  sortSelect.addEventListener('change', () => {
+    ordenarFilas();
+    render();
+  });
+
+  // ---- Exportar / Importar copia de seguridad ----
+  exportBtn.addEventListener('click', () => {
+    const payload = {
+      exportado: new Date().toISOString(),
+      filas: filas
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fecha = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `alitrack-cartera-${fecha}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  importBtn.addEventListener('click', () => importFile.click());
+
+  importFile.addEventListener('change', () => {
+    const file = importFile.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const data = JSON.parse(reader.result);
+        const nuevasFilas = Array.isArray(data) ? data : data.filas;
+        if (!Array.isArray(nuevasFilas)) throw new Error('formato');
+        filas = nuevasFilas.map(f => ({
+          ticker: f.ticker || '',
+          compra: f.compra || '',
+          acciones: f.acciones || '',
+          actualUSD: (f.actualUSD !== undefined) ? f.actualUSD : null,
+          moneda: f.moneda || '$',
+          error: false
+        }));
+        guardar();
+        render();
+        updateInfo.textContent = 'Copia importada correctamente';
+      }catch(e){
+        updateInfo.innerHTML = '<span class="fx-error">El archivo no es una copia válida de AliTrack</span>';
+      }
+      importFile.value = '';
+    };
+    reader.readAsText(file);
+  });
+
   refreshBtn.addEventListener('click', actualizarPrecios);
   addBtn.addEventListener('click', nuevaFila);
+  ordenarFilas();
   render();
+
+  // ---- Auto-actualizar al abrir la página, si ya hay clave guardada ----
+  if ((localStorage.getItem(APIKEY_KEY) || '').trim()){
+    actualizarPrecios();
+  }
 </script>
 </body>
 </html>
