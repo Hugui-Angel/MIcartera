@@ -57,15 +57,36 @@
     background: var(--panel);
     border: 1px solid var(--panel-border);
     border-radius: 14px;
-    padding: 16px 16px;
-    margin-bottom: 18px;
+    padding: 14px 16px 16px;
+    margin-bottom: 14px;
+  }
+  .summary-grid{
     display:grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
-  .summary .item{ text-align:center; }
-  .summary .k{ font-size: 0.68rem; text-transform:uppercase; letter-spacing:.04em; color: var(--muted); display:block; margin-bottom:4px; }
-  .summary .v{ font-size: 0.98rem; font-weight: 700; color: var(--text); }
+  .summary-grid .item{ text-align:center; }
+  .summary-grid .k{ font-size: 0.68rem; text-transform:uppercase; letter-spacing:.04em; color: var(--muted); display:block; margin-bottom:4px; }
+  .summary-grid .v{ font-size: 0.98rem; font-weight: 700; color: var(--text); }
+
+  .summary-label{
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .tax-warning{
+    font-size: 0.78rem;
+    color: var(--loss);
+    text-align: center;
+    margin-top: -4px;
+    margin-bottom: 18px;
+    padding: 0 6px;
+  }
 
   /* Tarjetas */
   #list{ display:flex; flex-direction:column; gap: 16px; }
@@ -79,7 +100,6 @@
     user-select: none;
     transition: background .2s ease, transform .1s ease;
   }
-  .card.pressing{ background: rgba(239,132,132,0.18); transform: scale(0.99); }
 
   .row{
     display:grid;
@@ -158,7 +178,55 @@
 
   .empty-state{ text-align:center; color: var(--muted); padding: 30px 10px; font-size: 0.85rem; }
 
-  /* Modal confirmacion */
+  /* Botón de borrar (X) en la esquina de la tarjeta */
+  .delete-x{
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--loss);
+    color: #2a0d0d;
+    border: 2px solid var(--bg);
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    z-index: 5;
+  }
+  .delete-x:hover{ filter: brightness(1.1); }
+  .delete-x:active{ transform: scale(0.92); }
+
+  /* Aviso de borrado en línea (ocupa el sitio del ticker borrado) */
+  .undo-inline{
+    background: rgba(239,132,132,0.14);
+    border: 1px solid rgba(239,132,132,0.5);
+    border-radius: 14px;
+    padding: 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 12px;
+    font-size: 0.85rem;
+  }
+  .undo-inline button{
+    background: var(--accent);
+    color: #0b1a10;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* Modal confirmación */
   .modal-backdrop{
     position: fixed; inset:0;
     background: rgba(0,0,0,0.55);
@@ -361,6 +429,7 @@
   <header>
     <div>
       <h1>Mi Cartera</h1>
+      <div class="sub">No incluye dividendos cobrados</div>
     </div>
     <button class="add" id="addBtn">+ Añadir ticker</button>
   </header>
@@ -371,11 +440,25 @@
   </div>
 
   <div class="summary">
-    <div class="item"><span class="k">Capital invertido €</span><span class="v" id="totInvertido">—</span></div>
-    <div class="item"><span class="k">Ganancia €</span><span class="v" id="totGanEUR">—</span></div>
-    <div class="item"><span class="k">Capital actual €</span><span class="v" id="totValor">—</span></div>
-    <div class="item"><span class="k">Ganancia %</span><span class="v" id="totGanPct">—</span></div>
+    <div class="summary-label">Antes de impuestos</div>
+    <div class="summary-grid">
+      <div class="item"><span class="k">Capital invertido €</span><span class="v" id="totInvertido">—</span></div>
+      <div class="item"><span class="k">Ganancia €</span><span class="v" id="totGanEUR">—</span></div>
+      <div class="item"><span class="k">Capital actual €</span><span class="v" id="totValor">—</span></div>
+      <div class="item"><span class="k">Ganancia %</span><span class="v" id="totGanPct">—</span></div>
+    </div>
   </div>
+
+  <div class="summary">
+    <div class="summary-label">Después de impuestos</div>
+    <div class="summary-grid">
+      <div class="item"><span class="k">Hacienda €</span><span class="v" id="totHaciendaEUR">—</span></div>
+      <div class="item"><span class="k">Ganancia € neta</span><span class="v" id="totGanNetaEUR">—</span></div>
+      <div class="item"><span class="k">Hacienda %</span><span class="v" id="totHaciendaPct">—</span></div>
+      <div class="item"><span class="k">Ganancia % neta</span><span class="v" id="totGanNetaPct">—</span></div>
+    </div>
+  </div>
+  <div class="tax-warning hidden" id="taxWarning"></div>
 
   <div class="controls">
     <label for="sortSelect">Ordenar por</label>
@@ -388,7 +471,6 @@
   </div>
 
   <div id="list"></div>
-  <div class="hint">Mantén pulsada una tarjeta para borrarla</div>
 
   <div class="settings">
     <input class="apikey" id="apiKeyInput" type="text" placeholder="Tu API key de Finnhub">
@@ -398,8 +480,7 @@
       <button id="importBtn">⬆ Importar copia</button>
       <input type="file" id="importFile" accept="application/json" style="display:none">
     </div>
-  </div>
-</div>
+  </div></div>
 
 <div class="modal-backdrop hidden" id="modalBackdrop">
   <div class="modal">
@@ -449,6 +530,28 @@
     return { invertidoEUR, valorEUR, ganEUR, ganPct };
   }
 
+  // Tramos IRPF base del ahorro (España, 2026) para plusvalías por venta de acciones
+  const TRAMOS_AHORRO = [
+    { hasta: 6000,     tipo: 0.19 },
+    { hasta: 50000,    tipo: 0.21 },
+    { hasta: 200000,   tipo: 0.23 },
+    { hasta: 300000,   tipo: 0.27 },
+    { hasta: Infinity, tipo: 0.30 }
+  ];
+
+  function calcularImpuestoAhorro(ganancia){
+    if (!isFinite(ganancia) || ganancia <= 0) return 0;
+    let impuesto = 0;
+    let anterior = 0;
+    for (const tramo of TRAMOS_AHORRO){
+      if (ganancia <= anterior) break;
+      const baseTramo = Math.min(ganancia, tramo.hasta) - anterior;
+      impuesto += baseTramo * tramo.tipo;
+      anterior = tramo.hasta;
+    }
+    return impuesto;
+  }
+
   function cargar(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -484,15 +587,16 @@
     localStorage.setItem(APIKEY_KEY, apiKeyInput.value.trim());
   });
 
-  let pendingDeleteIdx = null;
-  let pressTimer = null;
-  const HOLD_MS = 5000;
-
   function nuevaFila(){
     filas.push({ticker:'', nombre:'', compra:'', actualUSD:null, acciones:'', moneda:'$', fecha:'', fxCompra:null, fxCompraFecha:'', error:false});
     guardar();
     render();
   }
+
+  // ---- Borrar con confirmación + deshacer en su sitio ----
+  let pendingDeleteIdx = null;
+  let ultimoBorrado = null; // { fila, idx }
+  let undoTimer = null;
 
   function pedirBorrado(idx){
     pendingDeleteIdx = idx;
@@ -508,12 +612,42 @@
   modalBackdrop.addEventListener('click', e => { if (e.target === modalBackdrop) cerrarModal(); });
   modalConfirm.addEventListener('click', () => {
     if (pendingDeleteIdx !== null){
-      filas.splice(pendingDeleteIdx, 1);
-      guardar();
-      render();
+      borrarFila(pendingDeleteIdx);
     }
     cerrarModal();
   });
+
+  function borrarFila(idx){
+    const fila = filas[idx];
+    filas.splice(idx, 1);
+    guardar();
+    ultimoBorrado = { fila, idx };
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(() => {
+      ultimoBorrado = null;
+      render();
+    }, 8000);
+    render();
+  }
+
+  function deshacerBorrado(){
+    if (!ultimoBorrado) return;
+    const pos = Math.min(ultimoBorrado.idx, filas.length);
+    filas.splice(pos, 0, ultimoBorrado.fila);
+    guardar();
+    clearTimeout(undoTimer);
+    ultimoBorrado = null;
+    render();
+  }
+
+  function crearUndoInline(){
+    const div = document.createElement('div');
+    div.className = 'undo-inline';
+    const nombreTxt = (ultimoBorrado.fila.ticker || '').trim().toUpperCase() || 'Ticker';
+    div.innerHTML = `<span>${nombreTxt} borrado</span><button type="button" id="undoBtnInline">Deshacer</button>`;
+    div.querySelector('#undoBtnInline').addEventListener('click', deshacerBorrado);
+    return div;
+  }
 
   function actualizarCampo(idx, campo, valor){
     filas[idx][campo] = valor;
@@ -525,38 +659,31 @@
     renderCalculos();
   }
 
-  function attachHold(card, idx){
-    const start = (e) => {
-      if (e.target.closest('input') || e.target.closest('.currency-toggle')) return;
-      card.classList.add('pressing');
-      pressTimer = setTimeout(() => {
-        card.classList.remove('pressing');
-        pedirBorrado(idx);
-      }, HOLD_MS);
-    };
-    const cancel = () => {
-      clearTimeout(pressTimer);
-      card.classList.remove('pressing');
-    };
-    card.addEventListener('mousedown', start);
-    card.addEventListener('touchstart', start, {passive:true});
-    ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev => card.addEventListener(ev, cancel));
-  }
-
   function render(){
     list.innerHTML = '';
     if (filas.length === 0){
-      list.innerHTML = '<div class="empty-state">No hay tickers. Pulsa "+ Añadir ticker" para empezar.</div>';
+      if (ultimoBorrado){
+        list.appendChild(crearUndoInline());
+      } else {
+        list.innerHTML = '<div class="empty-state">No hay tickers. Pulsa "+ Añadir ticker" para empezar.</div>';
+      }
       renderCalculos();
       return;
     }
 
+    let undoInsertado = false;
     filas.forEach((fila, idx) => {
+      if (ultimoBorrado && idx === ultimoBorrado.idx){
+        list.appendChild(crearUndoInline());
+        undoInsertado = true;
+      }
+
       const card = document.createElement('div');
       card.className = 'card';
       const simbolo = fila.moneda === '€' ? '€' : '$';
       const errorNote = fila.error ? `<div class="field-note">No se pudo obtener, edítalo a mano</div>` : '';
       card.innerHTML = `
+        <button type="button" class="delete-x" data-idx="${idx}" title="Borrar ticker">✕</button>
         <div class="row row-3">
           <div class="field">
             <label>Ticker</label>
@@ -623,8 +750,11 @@
         </div>
       `;
       list.appendChild(card);
-      attachHold(card, idx);
     });
+
+    if (ultimoBorrado && !undoInsertado){
+      list.appendChild(crearUndoInline());
+    }
 
     list.querySelectorAll('input.cell').forEach(inp => {
       inp.addEventListener('input', e => {
@@ -644,12 +774,19 @@
       });
     });
 
+    list.querySelectorAll('.delete-x').forEach(btn => {
+      btn.addEventListener('click', e => {
+        pedirBorrado(parseInt(e.target.closest('.delete-x').dataset.idx));
+      });
+    });
+
     renderCalculos();
   }
 
   function renderCalculos(){
     const cards = list.querySelectorAll('.card');
     let totInvertido = 0, totValor = 0, hayDatos = false;
+    let tickersFaltantes = [];
     const rate = fxRate; // 1 USD -> rate EUR
 
     cards.forEach((card, idx) => {
@@ -686,6 +823,9 @@
           el.textContent = datosCompletos ? 'Sin tipo €' : '—';
           el.classList.remove('pos','neg');
         });
+        if ((f.ticker || '').trim()){
+          tickersFaltantes.push(f.ticker.trim().toUpperCase());
+        }
       }
     });
 
@@ -701,6 +841,42 @@
     totGPEl.textContent = hayDatos ? fmtPct(totGanPct) : '—';
     totGEEl.style.color = hayDatos ? (totGanEUR >= 0 ? 'var(--accent)' : 'var(--loss)') : 'var(--text)';
     totGPEl.style.color = totGEEl.style.color;
+
+    // ---- Después de impuestos ----
+    const taxWarning = document.getElementById('taxWarning');
+    const totHaciendaEUREl = document.getElementById('totHaciendaEUR');
+    const totGanNetaEUREl = document.getElementById('totGanNetaEUR');
+    const totHaciendaPctEl = document.getElementById('totHaciendaPct');
+    const totGanNetaPctEl = document.getElementById('totGanNetaPct');
+
+    if (tickersFaltantes.length > 0){
+      taxWarning.textContent = `Falta calcular: ${tickersFaltantes.join(', ')} — el total de impuestos no incluye estos tickers`;
+      taxWarning.classList.remove('hidden');
+    } else {
+      taxWarning.classList.add('hidden');
+    }
+
+    if (hayDatos && tickersFaltantes.length === 0){
+      const hacienda = calcularImpuestoAhorro(totGanEUR);
+      const ganNetaEUR = totGanEUR - hacienda;
+      const haciendaPct = totGanEUR > 0 ? (hacienda / totGanEUR) * 100 : 0;
+      const ganNetaPct = totInvertido > 0 ? (ganNetaEUR / totInvertido) * 100 : NaN;
+
+      totHaciendaEUREl.textContent = fmtEUR(hacienda);
+      totGanNetaEUREl.textContent = fmtEUR(ganNetaEUR);
+      totHaciendaPctEl.textContent = totGanEUR > 0 ? `${haciendaPct.toLocaleString('es-ES',{maximumFractionDigits:2})} %` : '—';
+      totGanNetaPctEl.textContent = fmtPct(ganNetaPct);
+
+      totGanNetaEUREl.style.color = ganNetaEUR >= 0 ? 'var(--accent)' : 'var(--loss)';
+      totGanNetaPctEl.style.color = totGanNetaEUREl.style.color;
+      totHaciendaEUREl.style.color = 'var(--text)';
+      totHaciendaPctEl.style.color = 'var(--text)';
+    } else {
+      [totHaciendaEUREl, totGanNetaEUREl, totHaciendaPctEl, totGanNetaPctEl].forEach(el => {
+        el.textContent = '—';
+        el.style.color = 'var(--text)';
+      });
+    }
   }
 
   async function obtenerTipoCambio(){
@@ -741,11 +917,6 @@
 
   async function actualizarPrecios(){
     const apiKey = (localStorage.getItem(APIKEY_KEY) || '').trim();
-    if (!apiKey){
-      updateInfo.innerHTML = '<span class="fx-error">Falta la API key de Finnhub (arriba)</span>';
-      apiKeyInput.focus();
-      return;
-    }
 
     refreshBtn.disabled = true;
     refreshBtn.classList.add('spinning');
@@ -759,27 +930,29 @@
 
     for (let i = 0; i < filas.length; i++){
       const ticker = (filas[i].ticker || '').trim().toUpperCase();
-      if (!ticker){ filas[i].error = false; continue; }
-      try{
-        const precio = await obtenerPrecio(ticker, apiKey);
-        filas[i].actualUSD = precio;
-        filas[i].error = false;
-      }catch(e){
-        filas[i].error = true;
-      }
-      await esperar(120);
-
-      // Nombre de la empresa, solo si el campo está vacío (no pisa lo que hayas escrito tú)
-      if (!filas[i].nombre || !filas[i].nombre.trim()){
+      if (!ticker){ filas[i].error = false; }
+      else if (apiKey){
         try{
-          filas[i].nombre = await obtenerNombreEmpresa(ticker, apiKey);
+          const precio = await obtenerPrecio(ticker, apiKey);
+          filas[i].actualUSD = precio;
+          filas[i].error = false;
         }catch(e){
-          // si falla, se deja vacío y se puede escribir a mano
+          filas[i].error = true;
         }
         await esperar(120);
+
+        // Nombre de la empresa, solo si el campo está vacío (no pisa lo que hayas escrito tú)
+        if (!filas[i].nombre || !filas[i].nombre.trim()){
+          try{
+            filas[i].nombre = await obtenerNombreEmpresa(ticker, apiKey);
+          }catch(e){
+            // si falla, se deja vacío y se puede escribir a mano
+          }
+          await esperar(120);
+        }
       }
 
-      // Tipo de cambio histórico, solo si hay fecha y no está ya en caché para esa fecha
+      // Tipo de cambio histórico: esto no depende de Finnhub, se hace siempre que haya fecha
       const fecha = filas[i].fecha;
       if (fecha && filas[i].moneda !== '€' && fecha !== filas[i].fxCompraFecha){
         try{
@@ -796,9 +969,13 @@
     guardar();
     ultimaActualizacion = new Date();
     const horaTxt = ultimaActualizacion.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
-    updateInfo.textContent = fxRate
+    let mensaje = fxRate
       ? `Actualizado a las ${horaTxt} · 1 $ = ${fxRate.toLocaleString('es-ES',{maximumFractionDigits:4})} €`
       : `Actualizado a las ${horaTxt} · no se pudo obtener el tipo de cambio`;
+    if (!apiKey){
+      mensaje += ' · Sin API key: precios no actualizados (edítalos a mano)';
+    }
+    updateInfo.textContent = mensaje;
 
     refreshBtn.disabled = false;
     refreshBtn.classList.remove('spinning');
@@ -896,10 +1073,8 @@
   ordenarFilas();
   render();
 
-  // ---- Auto-actualizar al abrir la página, si ya hay clave guardada ----
-  if ((localStorage.getItem(APIKEY_KEY) || '').trim()){
-    actualizarPrecios();
-  }
+  // ---- Auto-actualizar al abrir la página (tipo de cambio siempre; precios solo si hay clave) ----
+  actualizarPrecios();
 </script>
 </body>
 </html>
