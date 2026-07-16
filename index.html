@@ -179,6 +179,28 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .card-divider{
+    height: 1px;
+    background: var(--panel-border);
+    margin: 12px 0;
+  }
+  .card.card-pos .card-divider{ background: rgba(95,214,143,0.7); }
+  .card.card-neg .card-divider{ background: rgba(239,132,132,0.7); }
+  .sell-btn{
+    width: 100%;
+    margin-top: 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 10px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+  }
+  .sell-btn:hover{ background: rgba(95,214,143,0.12); }
+  .sell-btn:active{ transform: scale(0.98); }
+
   .field label{
     display:block;
     font-size: 0.62rem;
@@ -325,6 +347,38 @@
     color: #2a0d0d;
     font-weight: 700;
   }
+
+  /* Modal de venta */
+  .sell-modal{
+    max-width: 460px;
+    text-align: left;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+  }
+  .sell-modal .delete-x.sell-close{
+    top: 10px;
+    right: 10px;
+  }
+  .sell-title{
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    padding-right: 30px;
+  }
+  .sell-subtitle{
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .sell-modal .row + .row{ margin-top: 12px; }
+  .sell-modal .summary-grid{ margin-top: 0; }
+  .sell-note{
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 14px 0 0;
+  }
   .hidden{ display:none; }
   .settings{
     background: var(--panel);
@@ -422,6 +476,17 @@
     font-size: 0.72rem;
     padding: 5px 7px;
     color-scheme: dark;
+  }
+
+  .fecha-hoy{
+    margin-top: 5px;
+    font-size: 0.72rem;
+    padding: 5px 7px;
+    color: var(--muted);
+    background: var(--input-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    text-align: center;
   }
 
   .fx-note{
@@ -578,8 +643,65 @@
   </div>
 </div>
 
+<div class="modal-backdrop hidden" id="sellBackdrop">
+  <div class="modal sell-modal">
+    <button type="button" class="delete-x sell-close" id="sellClose" title="Cerrar">✕</button>
+    <div class="sell-title">Si vendiera...</div>
+    <div class="sell-subtitle" id="sellSubtitle">¿Y si vendo solo parte de mis acciones, ahora mismo?</div>
+
+    <div class="row row-3">
+      <div class="field">
+        <label>Ticker</label>
+        <div class="calc-box" id="sellTicker">—</div>
+      </div>
+      <div class="field">
+        <label>Nombre</label>
+        <div class="calc-box" id="sellNombre">—</div>
+      </div>
+      <div class="field">
+        <label>Moneda</label>
+        <div class="calc-box" id="sellMoneda">—</div>
+      </div>
+    </div>
+
+    <div class="row row-3">
+      <div class="field">
+        <label>Nº acciones</label>
+        <input class="cell" type="number" step="any" min="0" id="sellAcciones">
+      </div>
+      <div class="field">
+        <label id="sellLabelCompra">Precio compra</label>
+        <div class="calc-box" id="sellPrecioCompra">—</div>
+      </div>
+      <div class="field">
+        <label id="sellLabelActual">Precio actual</label>
+        <div class="calc-box" id="sellPrecioActual">—</div>
+      </div>
+    </div>
+    <div class="fx-note" id="sellFecha"></div>
+    <div class="fx-note" id="sellFxRate"></div>
+
+    <div class="summary-divider"></div>
+    <div class="summary-grid">
+      <div class="item"><span class="k">Capital invertido (€)</span><span class="v" id="sellInvertido">—</span></div>
+      <div class="item"><span class="k">Capital actual (€)</span><span class="v" id="sellActual">—</span></div>
+      <div class="item"><span class="k">Ganancia bruta (€)</span><span class="v" id="sellGanBruta">—</span></div>
+      <div class="item"><span class="k">Ganancia bruta (%)</span><span class="v" id="sellGanBrutaPct">—</span></div>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-grid">
+      <div class="item"><span class="k">Hacienda (€)</span><span class="v" id="sellHacienda">—</span></div>
+      <div class="item"><span class="k">Hacienda (%)</span><span class="v" id="sellHaciendaPct">—</span></div>
+      <div class="item"><span class="k">Ganancia neta (€)</span><span class="v" id="sellGanNeta">—</span></div>
+      <div class="item"><span class="k">Ganancia neta (%)</span><span class="v" id="sellGanNetaPct">—</span></div>
+    </div>
+    <p class="sell-note">Estimación calculada como si esta fuera tu única venta del año. Si vendes más cosas en el mismo ejercicio, el tipo real puede variar porque Hacienda suma todas tus ganancias antes de aplicar los tramos.</p>
+  </div>
+</div>
+
 <script>
   const STORAGE_KEY = 'alitrack_cartera';
+  const hoyTxt = new Date().toLocaleDateString('es-ES');
   const APIKEY_KEY = 'alitrack_finnhub_key';
   const list = document.getElementById('list');
   const addBtn = document.getElementById('addBtn');
@@ -587,6 +709,9 @@
   const modalTicker = document.getElementById('modalTicker');
   const modalCancel = document.getElementById('modalCancel');
   const modalConfirm = document.getElementById('modalConfirm');
+  const sellBackdrop = document.getElementById('sellBackdrop');
+  const sellClose = document.getElementById('sellClose');
+  const sellAcciones = document.getElementById('sellAcciones');
   const apiKeyInput = document.getElementById('apiKeyInput');
   const refreshBtn = document.getElementById('refreshBtn');
   const updateInfo = document.getElementById('updateInfo');
@@ -636,6 +761,117 @@
       anterior = tramo.hasta;
     }
     return impuesto;
+  }
+
+  // ---- Simulación de venta (informativa, no modifica la cartera) ----
+  let ventaIdx = null;
+
+  function abrirVenta(idx){
+    ventaIdx = idx;
+    const f = filas[idx];
+    const simbolo = f.moneda === '€' ? '€' : '$';
+    const esEuro = f.moneda === '€';
+
+    document.getElementById('sellTicker').textContent = (f.ticker || '—').toUpperCase();
+    document.getElementById('sellNombre').textContent = f.nombre || '—';
+    document.getElementById('sellMoneda').textContent = esEuro ? 'Euro (€)' : 'Dólar ($)';
+    document.getElementById('sellLabelCompra').textContent = `Precio compra (${simbolo})`;
+    document.getElementById('sellLabelActual').textContent = `Precio actual (${simbolo})`;
+    document.getElementById('sellPrecioCompra').textContent = f.compra ? `${f.compra} ${simbolo}` : '—';
+    document.getElementById('sellPrecioActual').textContent = (f.actualUSD !== null && f.actualUSD !== undefined) ? `${f.actualUSD} ${simbolo}` : 'Pendiente';
+    document.getElementById('sellFecha').textContent = f.fecha ? `Fecha de compra: ${f.fecha.split('-').reverse().join('/')}` : '';
+
+    const rateCompra = esEuro ? null : (f.fxCompra || null);
+    const rateHoy = esEuro ? null : fxRate;
+    let fxTxt = '';
+    if (!esEuro){
+      if (rateCompra) fxTxt += `Compra: 1 $ = ${rateCompra.toLocaleString('es-ES',{maximumFractionDigits:4})} € · `;
+      fxTxt += rateHoy ? `Hoy: 1 $ = ${rateHoy.toLocaleString('es-ES',{maximumFractionDigits:4})} €` : 'Hoy: sin tipo de cambio';
+    }
+    document.getElementById('sellFxRate').textContent = fxTxt;
+
+    const totalAcciones = parseFloat(f.acciones) || 0;
+    sellAcciones.max = f.acciones || '';
+    sellAcciones.value = f.acciones || '';
+    document.getElementById('sellSubtitle').textContent =
+      `¿Y si vendo ${totalAcciones} de mis ${totalAcciones} acciones, ahora mismo?`;
+
+    recalcularVenta();
+    sellBackdrop.classList.remove('hidden');
+  }
+
+  function cerrarVenta(){
+    sellBackdrop.classList.add('hidden');
+    ventaIdx = null;
+  }
+
+  sellClose.addEventListener('click', cerrarVenta);
+  sellBackdrop.addEventListener('click', e => { if (e.target === sellBackdrop) cerrarVenta(); });
+
+  sellAcciones.addEventListener('input', () => {
+    const f = filas[ventaIdx];
+    const max = parseFloat(f.acciones);
+    let val = parseFloat(sellAcciones.value);
+    if (isFinite(max) && isFinite(val) && val > max){
+      val = max;
+      sellAcciones.value = max;
+    }
+    recalcularVenta();
+  });
+
+  function recalcularVenta(){
+    if (ventaIdx === null) return;
+    const f = filas[ventaIdx];
+    const accionesSim = parseFloat(sellAcciones.value);
+    const totalAcciones = parseFloat(f.acciones) || 0;
+
+    document.getElementById('sellSubtitle').textContent =
+      `¿Y si vendo ${isFinite(accionesSim) ? accionesSim : 0} de mis ${totalAcciones} acciones, ahora mismo?`;
+
+    const idInv = document.getElementById('sellInvertido');
+    const idAct = document.getElementById('sellActual');
+    const idGB = document.getElementById('sellGanBruta');
+    const idGBp = document.getElementById('sellGanBrutaPct');
+    const idHa = document.getElementById('sellHacienda');
+    const idHap = document.getElementById('sellHaciendaPct');
+    const idGN = document.getElementById('sellGanNeta');
+    const idGNp = document.getElementById('sellGanNetaPct');
+
+    const fSim = { ...f, acciones: accionesSim };
+    const r = calcularFila(fSim, fxRate);
+
+    if (!r || !isFinite(accionesSim) || accionesSim <= 0){
+      [idInv, idAct, idGB, idGBp, idHa, idHap, idGN, idGNp].forEach(el => {
+        el.textContent = '—';
+        el.style.color = 'var(--text)';
+      });
+      return;
+    }
+
+    const hacienda = calcularImpuestoAhorro(r.ganEUR);
+    const ganNeta = r.ganEUR - hacienda;
+    const haciendaPct = r.ganEUR > 0 ? (hacienda / r.ganEUR) * 100 : 0;
+    const ganNetaPct = r.invertidoEUR > 0 ? (ganNeta / r.invertidoEUR) * 100 : NaN;
+
+    idInv.textContent = fmtEUR(r.invertidoEUR);
+    idAct.textContent = fmtEUR(r.valorEUR);
+    idGB.textContent = fmtEUR(r.ganEUR);
+    idGBp.textContent = fmtPct(r.ganPct);
+    idHa.textContent = fmtEUR(hacienda);
+    idHap.textContent = r.ganEUR > 0 ? `${haciendaPct.toLocaleString('es-ES',{maximumFractionDigits:2})} %` : '—';
+    idGN.textContent = fmtEUR(ganNeta);
+    idGNp.textContent = fmtPct(ganNetaPct);
+
+    const colorGB = r.ganEUR >= 0 ? 'var(--accent)' : 'var(--loss)';
+    const colorGN = ganNeta >= 0 ? 'var(--accent)' : 'var(--loss)';
+    idGB.style.color = colorGB;
+    idGBp.style.color = colorGB;
+    idGN.style.color = colorGN;
+    idGNp.style.color = colorGN;
+    idInv.style.color = 'var(--text)';
+    idAct.style.color = 'var(--text)';
+    idHa.style.color = 'var(--text)';
+    idHap.style.color = 'var(--text)';
   }
 
   function cargar(){
@@ -742,6 +978,12 @@
       filas[idx].fxCompra = null;
       filas[idx].fxCompraFecha = '';
     }
+    if (campo === 'ticker'){
+      // El nombre ya no corresponde al ticker nuevo: se limpia para que se vuelva a buscar
+      filas[idx].nombre = '';
+      const nombreInput = list.querySelector(`input[data-idx="${idx}"][data-campo="nombre"]`);
+      if (nombreInput) nombreInput.value = '';
+    }
     guardar();
     renderCalculos();
   }
@@ -814,27 +1056,31 @@
               <input class="cell ${fila.error ? 'error-field' : ''}" type="number" step="any" data-idx="${idx}" data-campo="actualUSD" value="${fila.actualUSD !== null && fila.actualUSD !== undefined ? fila.actualUSD : ''}" placeholder="Pendiente">
               <span class="unit">${simbolo}</span>
             </div>
+            <div class="fecha-hoy">${hoyTxt}</div>
             ${errorNote}
           </div>
         </div>
+        <div class="card-divider"></div>
         <div class="row row-calc">
           <div class="field">
-            <label>Capital invertido €</label>
+            <label>Capital invertido (€)</label>
             <div class="calc-box" data-out="invertido">—</div>
           </div>
           <div class="field">
-            <label>Ganancia €</label>
-            <div class="calc-box" data-out="ganEUR">—</div>
-          </div>
-          <div class="field">
-            <label>Capital actual €</label>
+            <label>Capital actual (€)</label>
             <div class="calc-box" data-out="valor">—</div>
           </div>
           <div class="field">
-            <label>Ganancia %</label>
+            <label>Ganancia bruta (€)</label>
+            <div class="calc-box" data-out="ganEUR">—</div>
+          </div>
+          <div class="field">
+            <label>Ganancia bruta (%)</label>
             <div class="calc-box" data-out="ganPct">—</div>
           </div>
         </div>
+        <div class="card-divider"></div>
+        <button type="button" class="sell-btn" data-idx="${idx}">Si vendiera...</button>
       `;
       list.appendChild(card);
     });
@@ -864,6 +1110,12 @@
     list.querySelectorAll('.delete-x').forEach(btn => {
       btn.addEventListener('click', e => {
         pedirBorrado(parseInt(e.target.closest('.delete-x').dataset.idx));
+      });
+    });
+
+    list.querySelectorAll('.sell-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        abrirVenta(parseInt(e.target.dataset.idx));
       });
     });
 
